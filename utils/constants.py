@@ -1,9 +1,9 @@
 import configparser
-
+import os
 parser = configparser.ConfigParser()
 
 # Import constants from the config file
-if parser.read('../config/config.conf'):
+if parser.read('config/config.conf'):
     
     # Reddit API credentials
     CLIENT_ID = parser.get('api_keys', 'reddit_client_id')
@@ -28,4 +28,4 @@ if parser.read('../config/config.conf'):
     OUTPUT_PATH = parser.get('file_paths','output_path')
 
 else:
-    raise ValueError('Error: Config file not found. Config file should be located at ..config/config.conf')
+    raise ValueError('Error: Config file not found. Config file should be located at ..config/config.conf.\nCurrent working directory is {}'.format(os.getcwd()))
