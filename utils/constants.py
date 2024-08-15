@@ -8,6 +8,8 @@ if parser.read('config/config.conf'):
     # Reddit API credentials
     CLIENT_ID = parser.get('api_keys', 'reddit_client_id')
     CLIENT_SECRET = parser.get('api_keys', 'reddit_secret_key')
+    REDDIT_USER_NAME = parser.get('reddit', 'username')
+    REDDIT_PASSWORD = parser.get('reddit', 'password')
 
     #  AWS credentials and configurations
     AWS_ACCESS_KEY_ID = parser.get('aws','aws_access_key_id')
