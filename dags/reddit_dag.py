@@ -5,6 +5,7 @@ import requests
 import sys
 import os
 import logging
+import pandas as pd
 
 OAUTH_URL = 'https://oauth.reddit.com/'
 USER_AGENT = 'RedditDE/0.0.1 by u/Xavi422'
@@ -48,8 +49,9 @@ def get_access_token() -> str:
 
 # extract posts from Reddit and store in dataframe
 def extract_posts(access_token: str, subreddit: str, limit = None):
-    # lists to store posts
-    posts = []
+    # dataframe to store posts
+    # used because the volume of data is not large and can fit in memory
+    posts = pd.DataFrame()
     try:
         # headers for get request
         headers = {'User-Agent':USER_AGENT}
@@ -69,8 +71,23 @@ def extract_posts(access_token: str, subreddit: str, limit = None):
             res_data = res.json()
             after = res_data['data']['after']
 
+            # store data in dataframe
             for post in res_data['data']['children']:
-                posts.append(post['data']['title'])
+                full_name = post['data']['name']
+                title = post['data']['title']
+                body = post['data']['selftext']
+                flair = post['data']['link_flair_text']
+                upvotes = post['data']['ups']
+                downvotes = post['data']['downs']
+                rewards_count = post['data']['total_awards_received']
+                url = post['data']['url']
+                created_at = post['data']['created_utc']
+                
+                posts = pd.concat([posts, pd.DataFrame.from_records([{'full_name':full_name,
+                                                                      'title':title,'body':body,
+                                                                      'flair':flair,'upvotes':upvotes,
+                                                                      'downvotes':downvotes,'rewards_count':rewards_count,
+                                                                      'url':url,'created_at':created_at}])])
             
             if after is None:
                 break
@@ -81,13 +98,17 @@ def extract_posts(access_token: str, subreddit: str, limit = None):
     except Exception as e:
         raise
 
+def write_to_s3():
+    pass
+
 # extract data from Reddit
 @dag(default_args=default_args, schedule=None)
 def extract_data_dag():
 
     @task(task_id = 'extract_data')
-    def extract_data(subreddit='dataengineering', limit=100,file_name=f"reddit_{datetime.now().strftime('%Y%m%d')}"):
+    def extract_data(subreddit='dataengineering', limit=10,file_name=f"reddit_{datetime.now().strftime('%Y%m%d')}"):
         posts = extract_posts(get_access_token(), subreddit, limit)
+        print(len(posts))
         print(posts[:5])
 
     extract_data()
