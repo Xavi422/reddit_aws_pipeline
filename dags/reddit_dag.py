@@ -1,6 +1,7 @@
 from airflow import DAG
 from datetime import datetime, timedelta
 from airflow.decorators import dag, task
+from airflow.models.connection import Connection
 import requests
 import sys
 import os
@@ -12,7 +13,22 @@ USER_AGENT = 'RedditDE/0.0.1 by u/Xavi422'
 # set the parent folder of the dags folder to the first lookup location in the path which the interpreter searches for modules
 # this folder would be the airflow folder in the docker container since you mounted the volume to the dags folder
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.constants import CLIENT_ID, CLIENT_SECRET, REDDIT_USER_NAME, REDDIT_PASSWORD
+from utils.constants import CLIENT_ID, CLIENT_SECRET, REDDIT_USER_NAME, REDDIT_PASSWORD, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+
+# create connection to AWS
+conn = Connection(
+    conn_id = 'aws_default',
+    conn_type = 'aws',
+    login=AWS_ACCESS_KEY_ID,
+    password=AWS_SECRET_ACCESS_KEY,
+    extra={'region_name':'us-east-1'}
+)
+
+# generate connection
+env_key = f"AIRFLOW_CONN_{conn.conn_id.upper()}"
+conn_uri = conn.get_uri()
+os.environ[env_key] = conn_uri
+
 
 # define default args and constant yesterday
 yesterday = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
