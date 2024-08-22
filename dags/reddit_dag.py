@@ -1,19 +1,23 @@
 from airflow import DAG
-from datetime import datetime, timedelta
 from airflow.decorators import dag, task
 from airflow.models.connection import Connection
+from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+import pandas as pd
+
+from datetime import datetime, timedelta
 import requests
 import sys
 import os
 import logging
-import pandas as pd
+
+
+# set the parent folder of the dags folder to the first lookup location in the path so the interpreter can find modules
+#  /opt/airflow folder in docker container
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.constants import CLIENT_ID, CLIENT_SECRET, REDDIT_USER_NAME, REDDIT_PASSWORD, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
 
 OAUTH_URL = 'https://oauth.reddit.com/'
 USER_AGENT = 'RedditDE/0.0.1 by u/Xavi422'
-# set the parent folder of the dags folder to the first lookup location in the path which the interpreter searches for modules
-# this folder would be the airflow folder in the docker container since you mounted the volume to the dags folder
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.constants import CLIENT_ID, CLIENT_SECRET, REDDIT_USER_NAME, REDDIT_PASSWORD, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
 
 # create connection to AWS
 conn = Connection(
@@ -24,64 +28,95 @@ conn = Connection(
     extra={'region_name':'us-east-1'}
 )
 
-# generate connection
+# generate connection to aws
 env_key = f"AIRFLOW_CONN_{conn.conn_id.upper()}"
 conn_uri = conn.get_uri()
 os.environ[env_key] = conn_uri
 
 
-# define default args and constant yesterday
+# define yesterday and default args
 yesterday = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
 
 default_args = {
     'owner': 'airflow',
     'start_date': yesterday,
-    'catchup':False
+    'catchup': False
 }
 
-# connect to Reddit and return Reddit instance
-def get_access_token() -> str:
-    try:
-        # get access token
-        auth = requests.auth.HTTPBasicAuth(CLIENT_ID,CLIENT_SECRET)
-        # data for post request
-        data = {'grant_type':'password', 'username':REDDIT_USER_NAME, 'password':REDDIT_PASSWORD}
 
-        # headers for post request
-        headers = {'User-Agent':USER_AGENT}
 
-        # send post request
-        res = requests.post('https://www.reddit.com/api/v1/access_token', auth=auth, data=data, headers=headers)
-        
-        if res.status_code != 200:
-            raise Exception('Could not authenticate client. Check credentials')
-        
-        access_token = res.json().get('access_token')
-        logging.info('Access token retrieved successfully')
-        return access_token
-        
-    except Exception as e:
-        raise
+@dag(default_args=default_args, schedule=None)
+def extract_data_dag():
 
-# extract posts from Reddit and store in dataframe
-def extract_posts(access_token: str, subreddit: str, limit = None):
-    # dataframe to store posts
-    # used because the volume of data is not large and can fit in memory
-    posts = pd.DataFrame()
-    try:
-        # headers for get request
-        headers = {'User-Agent':USER_AGENT}
-        headers['Authorization'] = f'bearer {access_token}'
+    # get Reddit API access token
+    @task()
+    def get_access_token() -> str:
+        try:
+            # create auth object
+            auth = requests.auth.HTTPBasicAuth(CLIENT_ID,CLIENT_SECRET)
+            
+            # post request data and headers
+            data = {'grant_type':'password', 'username':REDDIT_USER_NAME, 'password':REDDIT_PASSWORD}
+            headers = {'User-Agent':USER_AGENT}
 
-        # parameters for get request
-        after = None
-        params = {'limit':limit,'after':after}
-
-        while True:
-            # send get request
-            res = requests.get(f'{OAUTH_URL}r/{subreddit}/new', headers=headers, params=params)
+            # post request
+            res = requests.post('https://www.reddit.com/api/v1/access_token', auth=auth, data=data, headers=headers)
+            
             if res.status_code != 200:
-                break
+                raise Exception('Could not authenticate client. Check credentials')
+            
+            # retrieve access token
+            access_token = res.json().get('access_token')
+            logging.info('Access token retrieved successfully')
+            return access_token
+            
+        except Exception:
+            raise
+    
+    
+    @task()
+    def extract_posts(access_token: str, endpoint: str, subreddit: str, limit = None) -> str:
+        
+        #list to store posts data
+        posts = []
+        fields = ['name','title','selftext','link_flair_text','ups','downs','total_awards_received','url','created_utc']
+        
+        try:
+            # headers for get request
+            headers = {'User-Agent':USER_AGENT}
+            headers['Authorization'] = f'bearer {access_token}'
+
+            # parameters for get request
+            after = None
+            params = {'limit':limit,'after':after}
+
+            # loop posts in batches of <limit>
+            # while True:
+            #     # send get request
+            #     res = requests.get(f'{OAUTH_URL}r/{subreddit}/{endpoint}', headers=headers, params=params)
+            #     if res.status_code != 200:
+            #         break
+                
+            #     # get data from response
+            #     res_data = res.json()
+            #     after = res_data['data']['after']
+
+            #     # store data in dataframe
+            #     for post in res_data['data']['children']:
+            #         post_data = post['data']
+            #         extract = {key:post_data[key] for key in fields}
+            #         posts.append(extract)
+
+            #     if after is None:
+            #         break
+                
+            #     params['after'] = after
+
+            # test
+            # send get request
+            res = requests.get(f'{OAUTH_URL}r/{subreddit}/{endpoint}', headers=headers, params=params)
+            if res.status_code != 200:
+                raise Exception('Could not retrieve posts from Reddit')
             
             # get data from response
             res_data = res.json()
@@ -89,47 +124,49 @@ def extract_posts(access_token: str, subreddit: str, limit = None):
 
             # store data in dataframe
             for post in res_data['data']['children']:
-                full_name = post['data']['name']
-                title = post['data']['title']
-                body = post['data']['selftext']
-                flair = post['data']['link_flair_text']
-                upvotes = post['data']['ups']
-                downvotes = post['data']['downs']
-                rewards_count = post['data']['total_awards_received']
-                url = post['data']['url']
-                created_at = post['data']['created_utc']
-                
-                posts = pd.concat([posts, pd.DataFrame.from_records([{'full_name':full_name,
-                                                                      'title':title,'body':body,
-                                                                      'flair':flair,'upvotes':upvotes,
-                                                                      'downvotes':downvotes,'rewards_count':rewards_count,
-                                                                      'url':url,'created_at':created_at}])])
-            
+                post_data = post['data']
+                extract = {key:post_data[key] for key in fields}
+                posts.append(extract)
+
             if after is None:
-                break
+                raise Exception('No more posts to retrieve')
             
             params['after'] = after
+            
+            
+            # create dataframe from posts list
+            df = pd.DataFrame(posts)
+
+            # add record load timestamp to DataFrame
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            df['rec_load_timestamp'] = timestamp
+            
+            # write dataframe to csv
+            filename = f"data/output/{subreddit}_{timestamp}.csv"
+            df.to_csv(filename, index=False)
+            return filename
         
-        return posts
-    except Exception as e:
-        raise
+        except Exception:
+            raise
 
-def write_to_s3():
-    pass
+    
+    @task()
+    def write_to_s3(filename: str,bucket_name = 'omscs-reddit-raw'):
+        try:
+            # create S3 hook
+            s3_hook = S3Hook(aws_conn_id='aws_default')
+            
+            # upload file to S3
+            key = filename.split('/')[-1]
+            s3_hook.load_file(filename=filename, key=key, bucket_name=bucket_name)
+            logging.info(f'{filename} uploaded to S3 bucket {bucket_name}')
+        
+        except Exception:
+            raise
 
-# extract data from Reddit
-@dag(default_args=default_args, schedule=None)
-def extract_data_dag():
+    
+    filename = extract_posts(get_access_token(), 'new', 'dataengineering', 10)
+    write_to_s3(filename, bucket_name='omscs-reddit-raw')
 
-    @task(task_id = 'extract_data')
-    def extract_data(subreddit='dataengineering', limit=10,file_name=f"reddit_{datetime.now().strftime('%Y%m%d')}"):
-        posts = extract_posts(get_access_token(), subreddit, limit)
-        print(len(posts))
-        print(posts[:5])
-
-    extract_data()
-
-
-# instantiate the DAG 
 extract_data_dag()
 

@@ -163,3 +163,5 @@ cython_debug/
 
 #Custom
 config/*
+data/input/*
+data/output/*
