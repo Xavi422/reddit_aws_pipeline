@@ -166,3 +166,4 @@ config/*
 data/input/*
 data/output/*
 lambda_function/package/*
+.DS_Store

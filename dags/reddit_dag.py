@@ -70,7 +70,8 @@ def extract_data_dag():
             logging.info('Access token retrieved successfully')
             return access_token
             
-        except Exception:
+        except Exception as e:
+            logging.error(f'Error retrieving access token -> {e}')
             raise
     
     
@@ -79,7 +80,8 @@ def extract_data_dag():
         
         #list to store posts data
         posts = []
-        fields = ['name','title','selftext','link_flair_text','ups','downs','total_awards_received','url','created_utc']
+        # desired fields
+        fields = ['name','title','link_flair_text','ups','downs','total_awards_received','url','created_utc']
         
         try:
             # headers for get request
@@ -91,47 +93,47 @@ def extract_data_dag():
             params = {'limit':limit,'after':after}
 
             # loop posts in batches of <limit>
-            # while True:
-            #     # send get request
-            #     res = requests.get(f'{OAUTH_URL}r/{subreddit}/{endpoint}', headers=headers, params=params)
-            #     if res.status_code != 200:
-            #         break
+            while True:
+                # send get request
+                res = requests.get(f'{OAUTH_URL}r/{subreddit}/{endpoint}', headers=headers, params=params)
+                if res.status_code != 200:
+                    break
                 
-            #     # get data from response
-            #     res_data = res.json()
-            #     after = res_data['data']['after']
+                # get data from response
+                res_data = res.json()
+                after = res_data['data']['after']
 
-            #     # store data in dataframe
-            #     for post in res_data['data']['children']:
-            #         post_data = post['data']
-            #         extract = {key:post_data[key] for key in fields}
-            #         posts.append(extract)
+                # store data in dataframe
+                for post in res_data['data']['children']:
+                    post_data = post['data']
+                    extract = {key:post_data[key] for key in fields}
+                    posts.append(extract)
 
-            #     if after is None:
-            #         break
+                if after is None:
+                    break
                 
-            #     params['after'] = after
+                params['after'] = after
 
             # test
-            # send get request
-            res = requests.get(f'{OAUTH_URL}r/{subreddit}/{endpoint}', headers=headers, params=params)
-            if res.status_code != 200:
-                raise Exception('Could not retrieve posts from Reddit')
+            # # send get request
+            # res = requests.get(f'{OAUTH_URL}r/{subreddit}/{endpoint}', headers=headers, params=params)
+            # if res.status_code != 200:
+            #     raise Exception('Could not retrieve posts from Reddit')
             
-            # get data from response
-            res_data = res.json()
-            after = res_data['data']['after']
+            # # get data from response
+            # res_data = res.json()
+            # after = res_data['data']['after']
 
-            # store data in dataframe
-            for post in res_data['data']['children']:
-                post_data = post['data']
-                extract = {key:post_data[key] for key in fields}
-                posts.append(extract)
+            # # store data in dataframe
+            # for post in res_data['data']['children']:
+            #     post_data = post['data']
+            #     extract = {key:post_data[key] for key in fields}
+            #     posts.append(extract)
 
-            if after is None:
-                raise Exception('No more posts to retrieve')
+            # if after is None:
+            #     raise Exception('No more posts to retrieve')
             
-            params['after'] = after
+            # params['after'] = after
             
             
             # create dataframe from posts list
@@ -146,7 +148,8 @@ def extract_data_dag():
             df.to_csv(filename, index=False)
             return filename
         
-        except Exception:
+        except Exception as e:
+            logging.error(f'Error extracting posts from Reddit -> {e}')
             raise
 
     
@@ -161,11 +164,12 @@ def extract_data_dag():
             s3_hook.load_file(filename=filename, key=key, bucket_name=bucket_name)
             logging.info(f'{filename} uploaded to S3 bucket {bucket_name}')
         
-        except Exception:
+        except Exception as e:
+            logging.error(f'Error uploading {filename} to S3 bucket {bucket_name} -> {e}')
             raise
 
     
-    filename = extract_posts(get_access_token(), 'new', 'dataengineering', 10)
+    filename = extract_posts(get_access_token(), 'new', 'OMSCS', 100)
     write_to_s3(filename, bucket_name='omscs-reddit-raw')
 
 extract_data_dag()
