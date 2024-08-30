@@ -112,39 +112,18 @@ def extract_data_dag():
                 if after is None:
                     break
                 
-                params['after'] = after
-
-            # test
-            # # send get request
-            # res = requests.get(f'{OAUTH_URL}r/{subreddit}/{endpoint}', headers=headers, params=params)
-            # if res.status_code != 200:
-            #     raise Exception('Could not retrieve posts from Reddit')
-            
-            # # get data from response
-            # res_data = res.json()
-            # after = res_data['data']['after']
-
-            # # store data in dataframe
-            # for post in res_data['data']['children']:
-            #     post_data = post['data']
-            #     extract = {key:post_data[key] for key in fields}
-            #     posts.append(extract)
-
-            # if after is None:
-            #     raise Exception('No more posts to retrieve')
-            
-            # params['after'] = after
-            
+                params['after'] = after            
             
             # create dataframe from posts list
             df = pd.DataFrame(posts)
 
             # add record load timestamp to DataFrame
-            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            timestamp_dt = datetime.now()
+            timestamp = timestamp_dt.strftime('%Y-%m-%d %H:%M:%S')
             df['rec_load_timestamp'] = timestamp
             
             # write dataframe to csv
-            filename = f"data/output/{subreddit}_{timestamp}.csv"
+            filename = f"data/output/{subreddit}_{endpoint}_{timestamp_dt.date()}.csv"
             df.to_csv(filename, index=False)
             return filename
         
