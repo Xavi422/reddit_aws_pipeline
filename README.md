@@ -9,13 +9,13 @@
 
 ## Overview
 
-This pipeline retrieves post data from a subreddit for analysis in Tableau by:
+This pipeline retrieves post data from a subreddit for analysis in Tableau via these steps:
 
 1. Call Reddit's subreddit API endpoint
 2. Extract post data
 2. Store the raw data in S3 bucket
 3. Clean/Transform data using AWS Lambda triggers
-4. Crawl transformed data in S3 using AWS Glue for schema definitions
+4. Crawl transformed data in S3 using AWS Glue crawler
 5. Create a connection to the data using AWS Athena + Glue
 6. Connect Tableau to Athena for analysis
 
