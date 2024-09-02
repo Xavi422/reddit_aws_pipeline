@@ -28,6 +28,7 @@ This pipeline retrieves post data from a subreddit for analysis in Tableau via t
 - Docker
 - Tableau/other Data Viz software with Athena connections
 - Python 3.11 or higher
+- config/config.conf file containing credentials used by utils.py
 
 ## Tableau Example
 ### Click to enlarge
