@@ -3,9 +3,9 @@
 ## Table of Contents
 
 - [Overview](#overview)
-- [Diagram](#diagram)
+- [Architecture Diagram](#architecture-diagram)
 - [Prerequisites](#prerequisites)
-- [Notes](#notes)
+- [Tableau Example](#tableau-example)
 
 ## Overview
 
@@ -19,7 +19,7 @@ This pipeline retrieves post data from a subreddit for analysis in Tableau via t
 5. Create a connection to the data using AWS Athena + Glue
 6. Connect Tableau to Athena for analysis
 
-## Diagram
+## Architecture Diagram
 ![RedditDataEngineering.png](assets%2Freddit_aws.png)
 
 ## Prerequisites
@@ -29,5 +29,6 @@ This pipeline retrieves post data from a subreddit for analysis in Tableau via t
 - Tableau/other Data Viz software with Athena connections
 - Python 3.11 or higher
 
-## Example Tableau
+## Tableau Example
+### Click to enlarge
 ![RedditAWSTableau.png](assets%2FTableau4Github.png)
