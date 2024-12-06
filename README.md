@@ -9,6 +9,9 @@
 
 ## Overview
 
+Purpose - Posts on the r/OMSCS subreddit must have a post flair assigned to them. However, Reddit does not natively support viewing post statistics by flair. Amidst concerns about post quality and a high volume of "dumb questions" at the beginning of the semester, I wanted to find out how different posts are received by flair. Reddit enforces a limit of 1000 most recent posts per API call so my solution was to setup a weekly Airflow DAG to pull the most recent 1000 posts, deduplicate and aggregate as the base dataset.
+
+
 This pipeline retrieves post data from a subreddit for analysis in Tableau via these steps:
 
 1. Call Reddit's subreddit API endpoint
