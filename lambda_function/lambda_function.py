@@ -3,6 +3,7 @@ import urllib.parse
 import boto3
 import pandas as pd
 from io import BytesIO
+import os
 
 # create s3 client
 s3 = boto3.client('s3')
@@ -28,11 +29,16 @@ def lambda_handler(event, context):
     # convert utc datetime to human-readable
     transformed_df['created_utc'] = pd.to_datetime(transformed_df['created_utc'],unit='s')
     
-    # Convert the transformed DataFrame back to CSV and upload to S3
+    # replace newline characters with spaces
+    transformed_df['title'] = transformed_df['title'].str.replace('\n',' ',regex=True)
+    
+    # Convert the transformed DataFrame to json and upload to S3
     out_buffer = BytesIO()
-    transformed_df.to_csv(out_buffer, index=False)
+    transformed_df.to_json(out_buffer, orient='records', lines=True)
     out_buffer.seek(0)
     
+    # change extension
+    key = os.path.splitext(key)[0] + '.json'
     transformed_bucket = '-'.join(raw_bucket.split('-')[:-1] + ['transformed'])
     s3.put_object(Bucket=transformed_bucket, Key=key, Body=out_buffer)
     
